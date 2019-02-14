@@ -6,10 +6,10 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.geospark.lib.GeoSpark;
@@ -24,91 +24,64 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 
 public class RegisterActivity extends AppCompatActivity {
-    EditText email;
-    EditText password;
-    Button registerButton,loginButton, newPassButton;
-    FirebaseAuth firebaseAuth;
+    private EditText mEdt_Email;
+    private EditText mEdt_Password;
+    private FirebaseAuth mFirebaseAuth;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.register_activity);
-
-        email = (EditText) findViewById(R.id.uyeEmail);
-        password = (EditText) findViewById(R.id.uyePassword);
-        registerButton = (Button) findViewById(R.id.yeniUyeButton);
-        loginButton = (Button) findViewById(R.id.uyeGirisButton);
-        newPassButton = (Button) findViewById(R.id.uyePasswordButton);
-
-
-        firebaseAuth = FirebaseAuth.getInstance();
-
-        registerButton.setOnClickListener(new View.OnClickListener() {
+        mFirebaseAuth = FirebaseAuth.getInstance();
+        mEdt_Email = (EditText) findViewById(R.id.edt_email);
+        mEdt_Password = (EditText) findViewById(R.id.edt_password);
+        TextView back = (TextView) findViewById(R.id.txt_back);
+        Button btn_register = (Button) findViewById(R.id.btn_register);
+        back.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                onBackPressed();
+            }
+        });
+        btn_register.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String lnemail = email.getText().toString();
-                String lnpassword = password.getText().toString();
+                String email = mEdt_Email.getText().toString();
+                String password = mEdt_Password.getText().toString();
+                if (TextUtils.isEmpty(email)) {
+                    Toast.makeText(getApplicationContext(), "Please fill in the required fields", Toast.LENGTH_SHORT).show();
+                } else if (TextUtils.isEmpty(password) || password.length() < 6) {
+                    Toast.makeText(getApplicationContext(), "Please enter password or must be at least 6 characters", Toast.LENGTH_SHORT).show();
+                } else {
+                    mFirebaseAuth.createUserWithEmailAndPassword(email, password).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
+                        @Override
+                        public void onComplete(@NonNull Task<AuthResult> task) {
+                            if (task.isSuccessful()) {
+                                DatabaseReference mDatabase = FirebaseDatabase.getInstance().getReference("users");
+                                String userId = mDatabase.push().getKey();
+                                mDatabase.child(userId).child("email").setValue(email);
+                                mDatabase.child(userId).child("device_token").setValue(SharedPreference.getToken(RegisterActivity.this));
+                                GeoSpark.createUser(RegisterActivity.this, email, new GeoSparkCallBack() {
+                                    @Override
+                                    public void onSuccess(GeoSparkUser geoSparkUser) {
+                                        mDatabase.child(userId).child("geospark_token").setValue(geoSparkUser.getUserId());
+                                        Intent i = new Intent(getApplicationContext(), MainActivity.class);
+                                        i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                        startActivity(i);
+                                        finish();
+                                    }
 
-                if(TextUtils.isEmpty(lnemail)){
-                    Toast.makeText(getApplicationContext(),"Please fill in the required fields",Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                if(TextUtils.isEmpty(lnpassword)){
-                    Toast.makeText(getApplicationContext(),"Please fill in the required fields",Toast.LENGTH_SHORT).show();
-                }
+                                    @Override
+                                    public void onFailure(GeoSparkError geoSparkError) {
 
-                if(lnpassword.length()<6){
-                    Toast.makeText(getApplicationContext(),"Password must be at least 6 characters",Toast.LENGTH_SHORT).show();
-                }
-
-                firebaseAuth.createUserWithEmailAndPassword(lnemail,lnpassword)
-                        .addOnCompleteListener(new OnCompleteListener<AuthResult>() {
-                            @Override
-                            public void onComplete(@NonNull Task<AuthResult> task) {
-                                if(task.isSuccessful()){
-
-                                    DatabaseReference mDatabase = FirebaseDatabase.getInstance().getReference("users");
-                                    String userId = mDatabase.push().getKey();
-                                    mDatabase.child(userId).child("email").setValue(lnemail);
-                                    mDatabase.child(userId).child("device_token").setValue(SharedPref.getToken(RegisterActivity.this));
-                                    //Log.e("TOKEN",SharedPref.getToken(RegisterActivity.this));
-                                    GeoSpark.createUser(RegisterActivity.this, lnemail, new GeoSparkCallBack() {
-                                        @Override
-                                        public void onSuccess(GeoSparkUser geoSparkUser) {
-                                            mDatabase.child(userId).child("geospark_token").setValue(geoSparkUser.getUserId());
-                                        }
-
-                                        @Override
-                                        public void onFailure(GeoSparkError geoSparkError) {
-
-                                        }
-                                    });
-                                    Intent i = new Intent(getApplicationContext(), MainActivity.class);
-                                    i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                                    startActivity(i);
-                                    finish();
-                                }
-                                else{
-                                    Toast.makeText(getApplicationContext(),"E-mail or password is wrong",Toast.LENGTH_SHORT).show();
-                                }
+                                    }
+                                });
+                            } else {
+                                Toast.makeText(getApplicationContext(), "e-mail or password is wrong", Toast.LENGTH_SHORT).show();
                             }
-                        });
-            }
-        });
-
-        loginButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent i = new Intent(getApplicationContext(), LoginActivity.class);
-                i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                startActivity(i);
-                finish();
-            }
-        });
-        newPassButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startActivity(new Intent(getApplicationContext(),NewPasswordActivity.class));
+                        }
+                    });
+                }
             }
         });
     }

@@ -1,10 +1,5 @@
 package lbn.geospark.com.geosparknotify;
 
-import android.os.Bundle;
-import android.os.Handler;
-import android.os.PersistableBundle;
-import android.support.annotation.Nullable;
-import android.support.v7.app.AppCompatActivity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -21,111 +16,85 @@ import com.geospark.lib.GeoSpark;
 import com.geospark.lib.callback.GeoSparkCallBack;
 import com.geospark.lib.model.GeoSparkError;
 import com.geospark.lib.model.GeoSparkUser;
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.SignInButton;
-import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.FirebaseApp;
-import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.auth.GoogleAuthProvider;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
-import com.google.firebase.iid.FirebaseInstanceId;
 
-
-import java.io.IOException;
-
-
-public class LoginActivity extends AppCompatActivity implements GoogleApiClient.OnConnectionFailedListener {
-    EditText loginEmail, loginPassword;
-    Button loginButton, registerButton, newPassButton;
-    FirebaseAuth firebaseAuth;
+public class LoginActivity extends AppCompatActivity {
+    private EditText mEdt_Email, mEdt_Password;
+    private FirebaseAuth mFirebaseAuth;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         GeoSpark.initialize(getApplication(), "YOUR-PUBLISHABLE-KEY");
-
         FirebaseApp.initializeApp(LoginActivity.this);
-        firebaseAuth = FirebaseAuth.getInstance();
-        if (firebaseAuth.getCurrentUser() != null) {
+        mFirebaseAuth = FirebaseAuth.getInstance();
+        if (mFirebaseAuth != null && mFirebaseAuth.getCurrentUser() != null) {
             startActivity(new Intent(getApplicationContext(), MainActivity.class));
             finish();
-
         } else {
             setContentView(R.layout.login_activity);
-            loginEmail = (EditText) findViewById(R.id.girisEmail);
-            loginPassword = (EditText) findViewById(R.id.girisParola);
-            loginButton = (Button) findViewById(R.id.girisButton);
-            registerButton = (Button) findViewById(R.id.uyeOlButton);
-            newPassButton = (Button) findViewById(R.id.yeniSifreButton);
-            loginButton.setOnClickListener(new View.OnClickListener() {
+            mEdt_Email = (EditText) findViewById(R.id.edt_email);
+            mEdt_Password = (EditText) findViewById(R.id.edt_password);
+            Button btn_Login = (Button) findViewById(R.id.btn_login);
+            Button btn_Register = (Button) findViewById(R.id.btn_register);
+            Button btn_newPassword = (Button) findViewById(R.id.btn_forgot_password);
+            btn_Login.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    String lnemail = loginEmail.getText().toString();
-                    String lnpassword = loginPassword.getText().toString();
-
-                    if (TextUtils.isEmpty(lnemail)) {
-                        Toast.makeText(getApplicationContext(), "Please fill in the required fields", Toast.LENGTH_SHORT).show();
-                        return;
+                    String email = mEdt_Email.getText().toString();
+                    String password = mEdt_Password.getText().toString();
+                    if (TextUtils.isEmpty(email)) {
+                        Toast.makeText(getApplicationContext(), "Please enter e-mail", Toast.LENGTH_SHORT).show();
+                    } else if (TextUtils.isEmpty(password)) {
+                        Toast.makeText(getApplicationContext(), "Please enter password", Toast.LENGTH_SHORT).show();
+                    } else {
+                        authWithUserPassword(email, password);
                     }
-                    if (TextUtils.isEmpty(lnpassword)) {
-                        Toast.makeText(getApplicationContext(), "Please fill in the required fields", Toast.LENGTH_SHORT).show();
-                    }
-
-                    authWithUserPassword(lnemail, lnpassword);
                 }
             });
-
-            registerButton.setOnClickListener(new View.OnClickListener() {
+            btn_Register.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     startActivity(new Intent(getApplicationContext(), RegisterActivity.class));
                 }
             });
-
-            newPassButton.setOnClickListener(new View.OnClickListener() {
+            btn_newPassword.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-                    startActivity(new Intent(getApplicationContext(), NewPasswordActivity.class));
+                    startActivity(new Intent(getApplicationContext(), ForgotPasswordActivity.class));
                 }
             });
         }
     }
 
     private void authWithUserPassword(String username, String password) {
-        firebaseAuth.signInWithEmailAndPassword(username, password).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
+        mFirebaseAuth.signInWithEmailAndPassword(username, password).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
             @Override
             public void onComplete(@NonNull Task<AuthResult> task) {
                 if (task.isSuccessful()) {
-                    final FirebaseUser user = firebaseAuth.getCurrentUser();
                     DatabaseReference mDatabase = FirebaseDatabase.getInstance().getReference().child("users");
                     mDatabase.orderByChild("email").equalTo(username).addValueEventListener(new ValueEventListener() {
                         @Override
                         public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                             for (DataSnapshot datas : dataSnapshot.getChildren()) {
-                                String geospark_token = datas.child("geospark_token").getValue().toString();
-                                Log.e("GEOSPARK TOKEN",geospark_token);
-                                GeoSpark.getUser(LoginActivity.this, geospark_token, new GeoSparkCallBack() {
+                                String userId = datas.child("geospark_token").getValue().toString();
+                                GeoSpark.getUser(LoginActivity.this, userId, new GeoSparkCallBack() {
                                     @Override
                                     public void onSuccess(GeoSparkUser geoSparkUser) {
+                                        Log.e("Login Success", geoSparkUser.getUserId());
                                         Intent i = new Intent(getApplicationContext(), MainActivity.class);
                                         i.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
                                         startActivity(i);
                                         finish();
-
-
-                                        Log.e("Login Success", geoSparkUser.getUserId());
                                     }
 
                                     @Override
@@ -146,25 +115,5 @@ public class LoginActivity extends AppCompatActivity implements GoogleApiClient.
                 }
             }
         });
-    }
-
-    private void authWithGoogle(GoogleSignInAccount account) {
-        AuthCredential credential = GoogleAuthProvider.getCredential(account.getIdToken(), null);
-        firebaseAuth.signInWithCredential(credential).addOnCompleteListener(new OnCompleteListener<AuthResult>() {
-            @Override
-            public void onComplete(@NonNull Task<AuthResult> task) {
-                if (task.isSuccessful()) {
-                    startActivity(new Intent(getApplicationContext(), MainActivity.class));
-                    finish();
-                } else {
-                    Toast.makeText(getApplicationContext(), "Auth Error", Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
-    }
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-
     }
 }
